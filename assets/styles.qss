@@ -1,0 +1,127 @@
+/* =======================================================
+   GLOBAL RESET & FONTS
+   ======================================================= */
+* {
+    font-family: 'Segoe UI', sans-serif;
+    color: #1e293b; /* Slate 800 */
+}
+
+QMainWindow {
+    background-color: #f8fafc; /* Slate 50 */
+}
+
+/* =======================================================
+   BUTTONS (COMPONENT)
+   ======================================================= */
+QPushButton {
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 0 20px;
+    height: 40px;
+    border: 1px solid transparent;
+}
+
+/* Primary Variant (Blue) */
+QPushButton[class="primary"] {
+    background-color: #2563eb;
+    color: white;
+}
+QPushButton[class="primary"]:hover {
+    background-color: #1d4ed8;
+}
+QPushButton[class="primary"]:pressed {
+    background-color: #1e40af;
+}
+QPushButton[class="primary"]:disabled {
+    background-color: #cbd5e1;
+    color: #94a3b8;
+}
+
+/* Outline Variant (White/Border) */
+QPushButton[class="outline"] {
+    background-color: transparent;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+}
+QPushButton[class="outline"]:hover {
+    background-color: #f1f5f9;
+    border-color: #94a3b8;
+}
+QPushButton[class="outline"]:disabled {
+    color: #cbd5e1;
+    border-color: #e2e8f0;
+}
+
+/* =======================================================
+   CARDS & CONTAINERS
+   ======================================================= */
+#ContentCard {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+}
+
+#HeaderTitle {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+#HeaderSubtitle {
+    font-size: 14px;
+    color: #64748b;
+}
+
+#CardTitle {
+    font-size: 16px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+/* =======================================================
+   TABLE WIDGET
+   ======================================================= */
+QTableWidget {
+    border: none;
+    background-color: white;
+    gridline-color: #e2e8f0;
+    selection-background-color: #f1f5f9;
+    selection-color: #1e293b;
+}
+
+QHeaderView::section {
+    background-color: #f8fafc;
+    color: #64748b;
+    padding: 12px;
+    border: none;
+    border-bottom: 2px solid #e2e8f0;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase; /* Professional touch */
+}
+
+QTableWidget::item {
+    padding: 12px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+/* =======================================================
+   FEEDBACK ELEMENTS
+   ======================================================= */
+QProgressBar {
+    border: none;
+    background-color: #e2e8f0;
+    border-radius: 3px;
+    height: 6px;
+}
+
+QProgressBar::chunk {
+    background-color: #2563eb;
+    border-radius: 3px;
+}
+
+QLabel#StatusText {
+    color: #64748b;
+    font-size: 12px;
+}

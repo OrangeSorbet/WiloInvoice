@@ -7,12 +7,10 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 class SecurityManager:
     def __init__(self):
-        # In prod, load this from secure env or key vault
         self._key = self._generate_key() 
         self._cipher = Fernet(self._key)
 
     def _generate_key(self):
-        # Derive a key from a hardware ID or fixed salt for local MVP
         password = b"WilowLocalSecureKey"
         salt = b'static_salt_change_in_prod' 
         kdf = PBKDF2HMAC(
@@ -36,7 +34,6 @@ class SecurityManager:
 
     @staticmethod
     def get_file_hash(file_path):
-        # SHA-256 fingerprinting for duplicate detection
         sha256 = hashlib.sha256()
         with open(file_path, 'rb') as f:
             while chunk := f.read(8192):
@@ -45,7 +42,6 @@ class SecurityManager:
 
     @staticmethod
     def sanitize_input(text):
-        # Prevent CSV injection
         if text and str(text).startswith(('=', '+', '-', '@')):
             return f"'{text}"
         return text
