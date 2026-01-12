@@ -17,9 +17,6 @@ OCR_CONFIG = r"--oem 3 --psm 6"
 AMOUNT_REGEX = r"(\d{1,3}(?:,\d{3})*\.\d{2})"
 GST_REGEX = r"\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]"
 DATE_REGEX = r"\d{2}[/-]\d{2}[/-]\d{4}"
-PAN_REGEX = r"[A-Z]{5}[0-9]{4}[A-Z]"
-IFSC_REGEX = r"[A-Z]{4}0[A-Z0-9]{6}"
-ACCOUNT_REGEX = r"\b\d{9,18}\b"
 
 
 class InvoicePipeline:
@@ -35,12 +32,6 @@ class InvoicePipeline:
         raw_text, method = self._extract_text(pdf_path)
         lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
 
-        # ---- FIX SGST RATE (table OCR issue) ----
-        cgst_rate = self._find_percent(lines, "CGST")
-        sgst_rate = self._find_percent(lines, "SGST")
-        if not sgst_rate and cgst_rate:
-            sgst_rate = cgst_rate
-
         return {
             # -------- File / Status --------
             "Filename": filename,
@@ -54,13 +45,14 @@ class InvoicePipeline:
             "Invoice Date": self._first_match(DATE_REGEX, raw_text),
             "Due Date": self._label_value(raw_text, ["Due Date"]),
             "Place of Supply": self._label_value(raw_text, ["Place of Supply"]),
+            "Payment Terms": self._label_value(raw_text, ["Payment Terms"]),
             "Currency": "INR",
 
             # -------- Vendor --------
             "Vendor Name": self._vendor_name(lines),
             "Vendor Address": self._vendor_address(lines),
             "Vendor GSTIN": self._first_match(GST_REGEX, raw_text),
-            "Vendor PAN": self._first_match(PAN_REGEX, raw_text),
+            "Vendor PAN": self._label_value(raw_text, ["PAN"]),
             "Vendor Email": self._label_value(raw_text, ["Email"]),
 
             # -------- Buyer --------
@@ -72,22 +64,22 @@ class InvoicePipeline:
             **self._extract_items(lines),
 
             # -------- Taxes --------
-            "CGST Rate (%)": cgst_rate,
+            "CGST Rate (%)": self._find_percent(lines, "CGST"),
             "CGST Amount": self._find_amount(lines, "CGST"),
-            "SGST Rate (%)": sgst_rate,
+            "SGST Rate (%)": self._find_percent(lines, "SGST"),
             "SGST Amount": self._find_amount(lines, "SGST"),
-            "Total Tax": self._find_amount(lines, "Tax"),
+            "Total Tax": self._find_amount(lines, "Total Tax"),
 
             # -------- Totals --------
-            "Subtotal": self._find_amount(lines, "Sub Total"),
+            "Subtotal": self._find_amount(lines, "Total"),
             "Grand Total": self._find_amount(lines, "Grand Total"),
             "Amount in Words": self._label_value(raw_text, ["Amount in Words"]),
 
             # -------- Bank --------
-            "Bank Name": self._label_value(raw_text, ["Bank"]),
+            "Bank Name": self._label_value(raw_text, ["Bank Name"]),
             "Account Name": self._label_value(raw_text, ["Account Name"]),
-            "Account Number": self._first_match(ACCOUNT_REGEX, raw_text),
-            "IFSC Code": self._first_match(IFSC_REGEX, raw_text),
+            "Account Number": self._label_value(raw_text, ["Account No"]),
+            "IFSC Code": self._label_value(raw_text, ["IFSC"]),
             "Branch": self._label_value(raw_text, ["Branch"]),
 
             # -------- Raw Backup --------
@@ -192,7 +184,7 @@ class InvoicePipeline:
 
     def _vendor_name(self, lines):
         for l in lines:
-            if any(x in l.upper() for x in ["PVT", "LTD", "PRIVATE"]):
+            if any(x in l.upper() for x in ["PVT", "LTD"]):
                 return l
         return ""
 
@@ -201,13 +193,13 @@ class InvoicePipeline:
 
     def _buyer_name(self, lines):
         for i, l in enumerate(lines):
-            if any(x in l.lower() for x in ["invoice to", "bill to"]):
+            if "invoice to" in l.lower():
                 return lines[i + 1]
         return ""
 
     def _buyer_address(self, lines):
         for i, l in enumerate(lines):
-            if any(x in l.lower() for x in ["invoice to", "bill to"]):
+            if "invoice to" in l.lower():
                 return " ".join(lines[i + 2:i + 6])
         return ""
 

@@ -6,15 +6,16 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QLabel, QHeaderView, QProgressBar,
     QFrame, QGraphicsDropShadowEffect, QAbstractItemView
 )
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QPropertyAnimation, QRect, QPoint, QEasingCurve
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QPropertyAnimation, QPoint, QEasingCurve
 from PySide6.QtGui import QColor
 
-from .core import InvoicePipeline
-from .storage import StorageEngine
+from src.core import InvoicePipeline, export_to_excel
 from .security import SecurityManager
 from .utils import setup_logger
 
 logger = setup_logger()
+
+# ---------------- ASSETS ----------------
 
 class AssetManager:
     @staticmethod
@@ -22,8 +23,11 @@ class AssetManager:
         path = os.path.join(os.path.dirname(__file__), '..', 'assets', 'styles.qss')
         path = os.path.abspath(path)
         if os.path.exists(path):
-            with open(path, "r") as f: return f.read()
+            with open(path, "r") as f:
+                return f.read()
         return ""
+
+# ---------------- UI COMPONENTS ----------------
 
 class StatusBadge(QLabel):
     def __init__(self, text, status_type):
@@ -52,10 +56,15 @@ class Toast(QLabel):
         self.setText(message)
         self.setWordWrap(True)
         self.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        
-        color_map = {"info": "#3b82f6", "success": "#22c55e", "warning": "#f59e0b", "error": "#ef4444"}
+
+        color_map = {
+            "info": "#3b82f6",
+            "success": "#22c55e",
+            "warning": "#f59e0b",
+            "error": "#ef4444"
+        }
         bg_color = color_map.get(level, "#333")
-        
+
         self.setStyleSheet(f"""
             QLabel {{
                 background-color: {bg_color};
@@ -65,13 +74,13 @@ class Toast(QLabel):
                 font-weight: 500;
             }}
         """)
-        
+
         shadow = QGraphicsDropShadowEffect(self)
         shadow.setBlurRadius(15)
         shadow.setColor(QColor(0, 0, 0, 40))
         shadow.setYOffset(4)
         self.setGraphicsEffect(shadow)
-        
+
         self.adjustSize()
         self.setFixedWidth(min(400, parent.width() - 40))
         self._animate(duration)
@@ -90,56 +99,56 @@ class Toast(QLabel):
         self.anim.setDuration(300)
         self.anim.setStartValue(QPoint(x_pos, start_y))
         self.anim.setEndValue(QPoint(x_pos, end_y))
-        
-        self.anim.setEasingCurve(QEasingCurve.OutCubic) 
+        self.anim.setEasingCurve(QEasingCurve.OutCubic)
         self.anim.start()
-        
+
         QTimer.singleShot(duration, lambda: (self.close(), self.deleteLater()))
 
+# ---------------- WORKER ----------------
+
 class Worker(QThread):
-    progress = Signal(str, str, str)
+    progress = Signal(dict, str)
     finished = Signal()
 
     def __init__(self, files):
         super().__init__()
         self.files = files
         self.pipeline = InvoicePipeline()
-        self.storage = StorageEngine()
 
     def run(self):
         for path in self.files:
             try:
-                fname = os.path.basename(path)
-                fhash = SecurityManager.get_file_hash(path)
                 data = self.pipeline.process_invoice(path)
-                saved = self.storage.save_invoice(fname, fhash, data)
-                
-                status = "Processed" if saved else "Duplicate"
-                vendor = data.get("vendor_name", "Unknown")
-                
-                self.progress.emit(fname, vendor, status)
+                self.progress.emit(data, "Processed")
             except Exception as e:
                 logger.error(f"Failed {path}: {e}")
-                self.progress.emit(os.path.basename(path), "N/A", "Error")
+                self.progress.emit(
+                    {"Filename": os.path.basename(path), "Vendor Name": "N/A"},
+                    "Error"
+                )
         self.finished.emit()
+
+# ---------------- MAIN WINDOW ----------------
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Wilow Invoice Extractor")
         self.resize(1100, 750)
-        
+
+        self.extracted_rows = []
+
         style_content = AssetManager.load_stylesheet()
         if style_content:
             self.setStyleSheet(style_content)
-        
+
         self._setup_ui()
         self._connect_signals()
 
     def _setup_ui(self):
         root = QWidget()
         self.setCentralWidget(root)
-        
+
         main_layout = QVBoxLayout(root)
         main_layout.setContentsMargins(32, 32, 32, 32)
         main_layout.setSpacing(24)
@@ -148,12 +157,12 @@ class MainWindow(QMainWindow):
         header = QWidget()
         h_layout = QHBoxLayout(header)
         h_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         title_block = QWidget()
         tb = QVBoxLayout(title_block)
-        tb.setContentsMargins(0,0,0,0)
+        tb.setContentsMargins(0, 0, 0, 0)
         tb.setSpacing(4)
-        
+
         lbl_title = QLabel("Invoice Extraction")
         lbl_title.setObjectName("HeaderTitle")
         lbl_sub = QLabel("Secure offline processing pipeline • v1.0")
@@ -161,7 +170,7 @@ class MainWindow(QMainWindow):
         tb.addWidget(lbl_title)
         tb.addWidget(lbl_sub)
 
-        self.btn_export = QPushButton("Export CSV")
+        self.btn_export = QPushButton("Export Excel")
         self.btn_export.setProperty("class", "outline")
         self.btn_export.setEnabled(False)
         self.btn_export.setFixedWidth(120)
@@ -183,10 +192,10 @@ class MainWindow(QMainWindow):
         shadow.setBlurRadius(20)
         shadow.setColor(QColor(0, 0, 0, 15))
         self.card.setGraphicsEffect(shadow)
-        
+
         card_layout = QVBoxLayout(self.card)
         card_layout.setContentsMargins(24, 24, 24, 24)
-        
+
         lbl_card = QLabel("Processed Queue")
         lbl_card.setObjectName("CardTitle")
         card_layout.addWidget(lbl_card)
@@ -198,6 +207,7 @@ class MainWindow(QMainWindow):
         self.table.setShowGrid(False)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setFocusPolicy(Qt.NoFocus)
+
         card_layout.addWidget(self.table)
         main_layout.addWidget(self.card)
 
@@ -205,15 +215,15 @@ class MainWindow(QMainWindow):
         footer = QWidget()
         f_layout = QHBoxLayout(footer)
         f_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
-        
+
         self.lbl_status = QLabel("System Ready")
         self.lbl_status.setFixedHeight(28)
         self.lbl_status.setObjectName("StatusPill")
         self.update_status_pill("System Ready", "idle")
-        
+
         main_layout.addWidget(self.progress_bar)
         f_layout.addWidget(self.lbl_status)
         f_layout.addStretch()
@@ -229,46 +239,49 @@ class MainWindow(QMainWindow):
     def update_status_pill(self, message, state="idle"):
         self.lbl_status.setText(message)
         styles = {
-            "idle":    "background-color: transparent; color: #64748b;",
-            "working": "background-color: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd;", 
-            "success": "background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0;", 
-            "error":   "background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca;"  
+            "idle": "background-color: transparent; color: #64748b;",
+            "working": "background-color: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd;",
+            "success": "background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0;",
+            "error": "background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca;"
         }
-        base_style = "padding: 0 16px; border-radius: 14px; font-weight: 600; font-size: 12px;"
-        self.lbl_status.setStyleSheet(f"QLabel {{ {base_style} {styles.get(state, styles['idle'])} }}")
+        base = "padding: 0 16px; border-radius: 14px; font-weight: 600; font-size: 12px;"
+        self.lbl_status.setStyleSheet(f"QLabel {{ {base} {styles.get(state)} }}")
+
+    # ---------------- ACTIONS ----------------
 
     def upload_files(self):
-        try:
-            files, _ = QFileDialog.getOpenFileNames(self, "Select Invoice PDFs", "", "PDF Files (*.pdf)")
-            if not files: return
+        files, _ = QFileDialog.getOpenFileNames(
+            self, "Select Invoice PDFs", "", "PDF Files (*.pdf)"
+        )
+        if not files:
+            return
 
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setRange(0, 0) 
-            self.update_status_pill("Encrypting and processing files...", "working")
-            self.btn_upload.setEnabled(False)
-            self.btn_export.setEnabled(False)
-            
-            self.worker = Worker(files)
-            self.worker.progress.connect(self.handle_progress)
-            self.worker.finished.connect(self.handle_finished)
-            self.worker.start()
-        except Exception as e:
-            logger.error(f"UI Upload Error: {e}")
-            self.show_toast("Critical error initializing upload.", "error")
-            self.update_status_pill("Error", "error")
+        self.extracted_rows.clear()
+        self.table.setRowCount(0)
 
-    def handle_progress(self, fname, vendor, status):
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)
+        self.update_status_pill("Processing invoices...", "working")
+        self.btn_upload.setEnabled(False)
+        self.btn_export.setEnabled(False)
+
+        self.worker = Worker(files)
+        self.worker.progress.connect(self.handle_progress)
+        self.worker.finished.connect(self.handle_finished)
+        self.worker.start()
+
+    def handle_progress(self, data, status):
         row = self.table.rowCount()
         self.table.insertRow(row)
+
+        fname = data.get("Filename", "Unknown")
+        vendor = data.get("Vendor Name", "Unknown")
+
         self.table.setItem(row, 0, QTableWidgetItem(fname))
         self.table.setItem(row, 1, QTableWidgetItem(vendor))
-        
-        container = QWidget()
-        l = QHBoxLayout(container)
-        l.setContentsMargins(0, 2, 0, 2)
-        l.setAlignment(Qt.AlignLeft)
-        l.addWidget(StatusBadge(status, status))
-        self.table.setCellWidget(row, 2, container)
+        self.table.setCellWidget(row, 2, StatusBadge(status, status))
+
+        self.extracted_rows.append(data)
         self.table.scrollToBottom()
 
     def handle_finished(self):
@@ -279,12 +292,19 @@ class MainWindow(QMainWindow):
         self.show_toast("Batch processing finished.", "success")
 
     def export_data(self):
+        if not self.extracted_rows:
+            self.show_toast("No data to export.", "warning")
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export Excel", "invoices_export.xlsx", "Excel Files (*.xlsx)"
+        )
+        if not path:
+            return
+
         try:
-            path, _ = QFileDialog.getSaveFileName(self, "Export Data", "invoices_export.csv", "CSV Files (*.csv)")
-            if path:
-                count = StorageEngine().export_to_csv(path)
-                self.update_status_pill(f"Exported {count} records", "success")
-                self.show_toast(f"Successfully exported {count} records.", "success")
+            export_to_excel(self.extracted_rows, path)
+            self.show_toast("Excel exported successfully.", "success")
         except Exception as e:
             logger.error(f"Export failed: {e}")
-            self.show_toast("Failed to export data.", "error")
+            self.show_toast("Failed to export Excel.", "error")
