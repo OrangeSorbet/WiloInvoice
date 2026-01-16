@@ -1,4 +1,4 @@
-# 📄 Wilow Invoice Extractor
+# 📄 Wilo Invoice Extractor
 
 **Version:** 1.0  
 **Type:** Desktop / Offline  
@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary
 
-The **Wilow Invoice Extractor** is a standalone, offline-first desktop application designed to automate the ingestion, extraction, and validation of vendor invoices. It replaces manual data entry with a secure, automated pipeline capable of processing both digital and scanned PDFs, enforcing strict data validation, and exporting structured data (CSV/JSON/DB) without requiring technical setup or internet connectivity.
+The **Wilo Invoice Extractor** is a standalone, offline-first desktop application designed to automate the ingestion, extraction, and validation of vendor invoices. It replaces manual data entry with a secure, automated pipeline capable of processing both digital and scanned PDFs, enforcing strict data validation, and exporting structured data (CSV/JSON/DB) without requiring technical setup or internet connectivity.
 
 ---
 
